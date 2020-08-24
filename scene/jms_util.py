@@ -1,7 +1,7 @@
 '''
 Functions for interfacing Jms stuff with the Blender scene.
 '''
-from mathutils import Quaternion, Vector
+from mathutils import *
 from .util import set_rotation, set_translation
 
 def set_rotation_from_jms(scene_object, jms_piece):
@@ -52,3 +52,7 @@ def get_absolute_node_transforms_from_jms(node_list):
 		}
 
 	return node_transforms
+def generate_matrix(node, SCALE = 1.0):
+    T = Matrix.Translation(Vector((node.pos_x,node.pos_y,node.pos_z)) * SCALE)
+    R = Quaternion((node.rot_w,node.rot_i,node.rot_j,node.rot_k)).inverted().to_matrix().to_4x4()
+    return T @ R

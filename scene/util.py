@@ -2,8 +2,8 @@
 Functions for interfacing Halo stuff with the Blender scene.
 '''
 import itertools
-
-from mathutils import Vector
+import bpy
+from mathutils import Vector, Quaternion, Matrix
 
 def set_rotation(scene_object, *, i=0.0, j=0.0, k=0.0, w=-1.0):
 	'''
@@ -99,7 +99,11 @@ def reduce_vertices(verts, tris):
 
 	# Return as tuples because they are nice and fast.
 	return tuple(new_verts), tuple(new_tris), translation_dict
-
+def generate_matrix(node, scale = 1.0):
+    T = Matrix.Translation(Vector((node.pos_x,node.pos_y,node.pos_z)) * scale)
+    R = Quaternion((node.rot_w,node.rot_i,node.rot_j,node.rot_k)).inverted().to_matrix().to_4x4()
+   
+    return T @ R
 def trace_into_direction(direction, distance=10000.0):
 	'''
 	Creates a point at (default) 10000 units into the given direction.
@@ -112,3 +116,8 @@ def trace_into_direction(direction, distance=10000.0):
 	point.rotate(direction)
 
 	return point
+
+def set_active_object(object):
+	bpy.context.view_layer.objects.active = object
+def get_active_object():
+	return bpy.context.view_layer.objects.active

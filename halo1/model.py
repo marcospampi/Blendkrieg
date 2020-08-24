@@ -12,8 +12,8 @@ from reclaimer.util.geometry import point_distance_to_line
 
 from ..constants import (JMS_VERSION_HALO_1, NODE_NAME_PREFIX,
 	MARKER_NAME_PREFIX)
-from ..scene.shapes import create_sphere
-from ..scene.util import (set_uniform_scale, reduce_vertices, trace_into_direction)
+from ..scene.shapes import create_sphere, create_empty
+from ..scene.util import (set_uniform_scale, reduce_vertices, trace_into_direction, generate_matrix)
 from ..scene.jms_util import (set_rotation_from_jms,
 	set_translation_from_jms, get_absolute_node_transforms_from_jms)
 
@@ -93,11 +93,7 @@ def import_halo1_nodes_from_jms(jms, *,
 	edit_bones = armature.edit_bones
 	bpy.ops.object.mode_set(mode='EDIT')
 
-	# "directions" of where each node is pointing for the attachment progress.
-	# These really are just points that are offset 1000 units in the direction
-	# the node is pointing from the point of the node's in scene head.
-	# These are used so we can check if two bones should be attached.
-	directions = {}
+
 
 	for i, node in enumerate(jms.nodes):
 		scene_node = edit_bones.new(name=NODE_NAME_PREFIX+node.name)
@@ -105,69 +101,26 @@ def import_halo1_nodes_from_jms(jms, *,
 		# Assign parent if index is valid.
 		scene_node.parent = scene_nodes.get(node.parent_index, None)
 
-		# If a node has multiple children we cannot connect its tail end
-		# to the children.
+		M = generate_matrix(node,scale)
+		scene_node.tail.x = node_size
+		if not scene_node.parent:
+			scene_node.matrix = M
+		else:
+			scene_node.matrix = scene_node.parent.matrix @ M
 
-		pos = absolute_transforms[i]['translation']
-		rot = absolute_transforms[i]['rotation']
-
-		# Bones when created start at 0 0 0 for their tail and head.
-		# We set the X of the tail, so it's not 0 length.
-		# X also is the forward direction for Halo bones.
-
-		scene_node.tail.x = 0.2
-
-		# We then rotate the bone by the absolute rotation that it should have.
-
-		scene_node.transform(rot.to_matrix(), scale=False)
-
-		# Then we add the absolute location to both the head and the tail.
-
-		scene_node.head += Vector(
-			(pos[0] * scale, pos[1] * scale, pos[2] * scale))
-		scene_node.tail += Vector(
-			(pos[0] * scale, pos[1] * scale, pos[2] * scale))
-
-		# Store the info we gathered this cycle.
 		scene_nodes[i] = scene_node
+		
+	node_custom_shape = create_empty(name="bone sphere",size=1)
 
-		# Store a "direction" for this node
-		directions[scene_node.name] = trace_into_direction(rot)
+	bpy.ops.object.mode_set(mode="POSE")
 
-	if len(attach_bones) > 0:
-		print('Checking if any bones with the prefixes %s can be connected.\n' %
-				(attach_bones,))
+	for bone in armature_obj.pose.bones:
+		bone.custom_shape = node_custom_shape
+		bone.custom_shape_scale = node_size * 5
 
-	# Add the node prefix to in-tag prefixes that we should attempt to connect.
-	attach_bones = tuple(map(lambda p : NODE_NAME_PREFIX + p, attach_bones))
+	bpy.ops.object.mode_set(mode="OBJECT")
 
-	# Attach all the bones that we should attach if we can safely do so.
-	for bone in armature.edit_bones:
-		children = bone.children
-
-		if (len(children) == 1 # Can't connect to multiple children, so don't.
-		and bone.name.startswith(attach_bones)
-		and children[0].name.startswith(attach_bones)):
-			child = children[0]
-
-			distance = point_distance_to_line(
-				child.head,
-				(bone.head, directions[bone.name]),
-				use_double_rounding=False)
-
-			if distance < max_attachment_distance:
-				print("Connecting %r to %r with distance %.12f" %
-						(child.name, bone.name, distance))
-				# If the child bone's head is on a line with the parent's tail
-				# direction we can set the parent tail to the location of the
-				# child head.
-				bone.tail = child.head
-				# Connect the bone so it stays attached when editing.
-				child.use_connect = True
-
-	# Change back to object mode so the rest of the script can execute properly.
-
-	bpy.ops.object.mode_set(mode='OBJECT')
+	view_layer.active_layer_collection.collection.objects.unlink(node_custom_shape)
 
 	return armature_obj, scene_nodes
 
@@ -205,20 +158,13 @@ def import_halo1_markers_from_jms(jms, *, armature=None, scale=1.0, node_size=0.
 			# Skip if not in one of the requested regions.
 			continue
 
-		scene_marker = create_sphere(
-			name=MARKER_NAME_PREFIX+marker.name,
-			size=(scale if import_radius else node_size))
+		scene_marker = create_empty(
+			name = MARKER_NAME_PREFIX + marker.name,
+			size = scale if import_radius else node_size,
+			display="SPHERE"
+		)
 
-		# Make the marker invisible in renders.
-		scene_marker.hide_render = True
-
-		# Set scale to be the size for easy changing of the marker size.
-		if import_radius:
-			set_uniform_scale(scene_marker, marker.radius)
-
-		set_rotation_from_jms(scene_marker, marker)
-
-		set_translation_from_jms(scene_marker, marker, scale)
+		scene_marker.matrix_world = generate_matrix(marker, scale)
 
 		# Assign parent if index is valid.
 		parent = scene_nodes.get(marker.parent, None)
@@ -226,11 +172,11 @@ def import_halo1_markers_from_jms(jms, *, armature=None, scale=1.0, node_size=0.
 			scene_marker.parent = armature
 			scene_marker.parent_type = 'BONE'
 			scene_marker.parent_bone = NODE_NAME_PREFIX+jms.nodes[marker.parent].name
-
+			scene_marker.location.y -= parent.length
 			# The rotation is offset by 0, 0, -90 euler, so we rotate it to
 			# fix that.
 
-			scene_marker.location.rotate(Euler((0.0, 0.0, math.radians(90.0))))
+			#scene_marker.location.rotate(Euler((0.0, 0.0, math.radians(90.0))))
 
 			# Then we subtract the length of the parent bone from the y axis,
 			# the y axis being the axis that is offset.
@@ -239,7 +185,7 @@ def import_halo1_markers_from_jms(jms, *, armature=None, scale=1.0, node_size=0.
 			# parent bone. In blender they are relative to the end of the bone.
 			# So, we subtract the length of the bone from the y axis to
 	        # make the final positions match up.
-			scene_marker.location.y -= parent.length
+			#scene_marker.location.y -= parent.length
 
 	#TODO: Should this return something?
 

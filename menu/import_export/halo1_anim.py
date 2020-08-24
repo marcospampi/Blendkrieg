@@ -26,49 +26,39 @@ class MT_krieg_ImportHalo1Anim(bpy.types.Operator, ImportHelper):
 
 	# Import-file-dialog settings:
 
-	filename_ext = ".model_animations"
+	#filename_ext = ".model_animations"
 	filter_glob: StringProperty( #".jma", ".jmm", ".jmo", ".jmr", ".jmt", ".jmw", ".jmz",
-		default="*.model_animations;*.jma;*.jmm;*.jmo;*.jmr;*.jmt;*.jmw;*.jmz",
+		default="*;*.model_animations;*.jma;*.jmm;*.jmo;*.jmr;*.jmt;*.jmw;*.jmz",
 		#options={'HIDDEN'},
 	)
 
-	# Node settings:
+	type_enum: EnumProperty(
+		name="Filter",
 
-	use_nodes: BoolProperty(
-		name="Import Nodes",
-		description="Import the nodes/frames.",
-		default=True,
+		items = (
+			(".jma","JMA","Animation"),
+			(".jmm","JMM","Moving animation"),
+			(".jmo","JMO","Overlay"),
+			(".jmr","JMR","Replacement"),
+			(".jmt","JMT","Rotation"),
+			(".jmw","JMW","World animation"),
+			(".jmz","JMZ","JMT but with diarrhea"),
+		),
+		default = {
+			".jma",
+			".jmm",
+			".jmo",
+			".jmr",
+			".jmt",
+			".jmw",
+			".jmz"
+		},
+		options={'ENUM_FLAG'},
+		description= "Check this https://num0005.github.io/h2codez_docs/w/H2Tool/Animations/Animations.html"
 	)
-	node_size: FloatProperty(
-		name="Node Scene Size",
-		description="Set the size that nodes should have in the Blender scene if at 1.0 scale.",
-		default=0.1,
-		min=0.0,
-	)
-	use_armatures: BoolProperty(
-		name="Import Nodes as Armature",
-		description="Import the nodes as armature.",
-		default=False,
-	)
-
-	# Marker settings:
-
-	use_markers: BoolProperty(
-		name="Import Markers",
-		description="Import the markers.",
-		default=True,
-	)
-	marker_size: FloatProperty(
-		name="Marker Scene Size",
-		description="Set the size that markers should have in the Blender scene.",
-		default=0.05,
-		min=0.0,
-	)
-
-	# Scaling settings:
 
 	scale_enum: EnumProperty(
-	name="Scale",
+		name="Scale",
 		items=(
 			('METRIC', "Blender",  "Use Blender's metric scaling."),
 			('MAX',    "3ds Max",  "Use 3dsmax's 100xHalo scale."),
@@ -99,34 +89,17 @@ class MT_krieg_ImportHalo1Anim(bpy.types.Operator, ImportHelper):
 			jma = read_halo1anim(self.filepath)
 		else:
 			jma = read_halojma(self.filepath)
-		print(jma)
-		import_animations(jma,scale)
+		format_filter = self.type_enum
+		import_animations(jma,scale,format_filter)
 		return {'FINISHED'}
 
 	def draw(self, context):
 		layout = self.layout
 
+		
 		# Node settings elements:
-
-		box = layout.box()
-		row = box.row()
-		row.label(text="Nodes:")
-		row.prop(self, "use_nodes")
-		if self.use_nodes:
-			box.prop(self, "node_size")
-			box.prop(self, "use_armatures")
-
-		# Marker settings elements:
-
-		box = layout.box()
-		row = box.row()
-		row.label(text="Markers:")
-		row.prop(self, "use_markers")
-		if self.use_markers:
-			box.prop(self, "node_size")
-
-		# Scale settings elements:
-
+		layout.box().prop(self,"type_enum",expand=True)
+		
 		box = layout.box()
 		box.label(text="Scale:")
 		row = box.row()
