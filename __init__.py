@@ -38,7 +38,7 @@ def unregister():
 	unregister functions in their respective modules.
 	'''
 	#Unregister classes in reverse order to avoid any dependency problems.
-	for module in reverse(modules):
+	for module in reversed(modules):
 		module.unregister()
 
 if __name__ == "__main__":

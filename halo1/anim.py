@@ -6,6 +6,10 @@ from math import pi, radians
 from reclaimer.hek.defs.antr import antr_def
 from reclaimer.animation.animation_decompilation import extract_model_animations
 from reclaimer.animation.jma import JmaAnimationSet,read_jma
+
+from ..constants import (JMS_VERSION_HALO_1, NODE_NAME_PREFIX,
+	MARKER_NAME_PREFIX, VERY_SMALL_NUMBER, FAKE_NODE_PREFIX)
+
 def read_halo1anim(filepath):
     ''' Generates JmaAnimationSet'''
 
@@ -47,7 +51,7 @@ def import_animations(animations,scale = 0.03048, format_filter = {}):
         scene.frame_end = len(anim.frames) - 1
         pose_bones = []
         for node in anim.nodes:
-            pose_bones.append(target.pose.bones[node.name])
+            pose_bones.append(target.pose.bones[NODE_NAME_PREFIX + node.name])
   
         for f in range(len(anim.frames)):
             bpy.context.scene.frame_set(f)

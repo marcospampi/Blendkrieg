@@ -121,3 +121,18 @@ def set_active_object(object):
 	bpy.context.view_layer.objects.active = object
 def get_active_object():
 	return bpy.context.view_layer.objects.active
+
+def get_front_direction(matrix):
+    return matrix @ Vector((0.0,0.0,-1.0))
+def get_horizontal_direction(matrix, scale = 1.0):
+    
+    return  (matrix @ Matrix.Scale(scale,4) ) @ Vector((1.0,0.0,0.0))
+def get_up_direction(matrix):
+    return matrix @ Vector((0.0,1.0,0.0))
+def centroid_3d(list):
+		vector = Vector((1.0,1.0,1.0))
+		if len(list) == 0:
+			return vector * 0.0
+		for elem in list:
+			vector += elem
+		return vector / len(list)

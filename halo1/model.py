@@ -11,9 +11,9 @@ from reclaimer.model.model_decompilation import extract_model
 from reclaimer.util.geometry import point_distance_to_line
 
 from ..constants import (JMS_VERSION_HALO_1, NODE_NAME_PREFIX,
-	MARKER_NAME_PREFIX)
+	MARKER_NAME_PREFIX, VERY_SMALL_NUMBER, FAKE_NODE_PREFIX)
 from ..scene.shapes import create_sphere, create_empty
-from ..scene.util import (set_uniform_scale, reduce_vertices, trace_into_direction, generate_matrix)
+from ..scene.util import (set_uniform_scale, reduce_vertices, trace_into_direction, generate_matrix, get_horizontal_direction, centroid_3d)
 from ..scene.jms_util import (set_rotation_from_jms,
 	set_translation_from_jms, get_absolute_node_transforms_from_jms)
 
@@ -35,7 +35,8 @@ def read_halo1model(filepath):
 			tag = mode_def.build(filepath=filepath)
 		#TODO: Get all lod permutations.
 		#Only getting the superhigh perms for now
-		jms = extract_model(tag.data.tagdata, write_jms=False)[0]
+		jms = extract_model(tag.data.tagdata, write_jms=False)
+		jms = list(filter(lambda m : m.lod_level == "superhigh",jms))
 		return jms
 
 	if filepath.lower().endswith('.jms'):
@@ -49,7 +50,7 @@ def read_halo1model(filepath):
 		if jms.version != JMS_VERSION_HALO_1:
 			raise ValueError('Not a Halo 1 jms!')
 
-		return jms
+		return [jms]
 
 
 from mathutils import Vector
@@ -58,7 +59,9 @@ def import_halo1_nodes_from_jms(jms, *,
 		scale=1.0,
 		node_size=0.02,
 		max_attachment_distance=0.00001,
-		attach_bones=('bip01',)):
+		attach_bones=('bip01',),
+		build_skeleton = False
+		):
 	'''
 	Import all the nodes from a jms into the scene as an armature and returns
 	a dict of them.
@@ -77,7 +80,6 @@ def import_halo1_nodes_from_jms(jms, *,
 
 	scene_nodes = {}
 
-	absolute_transforms = get_absolute_node_transforms_from_jms(jms.nodes)
 
 	armature = bpy.data.armatures.new('imported')
 	armature_obj = bpy.data.objects.new('imported', armature)
@@ -102,25 +104,29 @@ def import_halo1_nodes_from_jms(jms, *,
 		scene_node.parent = scene_nodes.get(node.parent_index, None)
 
 		M = generate_matrix(node,scale)
-		scene_node.tail.x = node_size
+		scene_node.tail = Vector((1.0,1.0,1.0)) *  VERY_SMALL_NUMBER
 		if not scene_node.parent:
 			scene_node.matrix = M
 		else:
 			scene_node.matrix = scene_node.parent.matrix @ M
 
 		scene_nodes[i] = scene_node
-		
-	node_custom_shape = create_empty(name="bone sphere",size=1)
+	if build_skeleton == True:
+		print ("I'm not gonna do this boi")
+
+	node_custom_shape = create_empty(name="bone sphere",size=node_size)
 
 	bpy.ops.object.mode_set(mode="POSE")
-
-	for bone in armature_obj.pose.bones:
-		bone.custom_shape = node_custom_shape
-		bone.custom_shape_scale = node_size * 5
+	if not build_skeleton:
+		for bone in armature_obj.pose.bones:
+			if bone.name[:1] == '$':
+				continue
+			bone.custom_shape = node_custom_shape
+			bone.custom_shape_scale = node_size * 5
 
 	bpy.ops.object.mode_set(mode="OBJECT")
 
-	view_layer.active_layer_collection.collection.objects.unlink(node_custom_shape)
+	#view_layer.active_layer_collection.collection.objects.unlink(node_custom_shape)
 
 	return armature_obj, scene_nodes
 
@@ -145,8 +151,9 @@ def import_halo1_markers_from_jms(jms, *, armature=None, scale=1.0, node_size=0.
 	if not len(permutation_filter):
 		# Do markers have a -1 no region state? Because this would not work if so.
 		region_filter = range(len(jms.regions))
+	markers = {}
 
-	for marker in jms.markers:
+	for i,marker in enumerate(jms.markers):
 		# Permutations cannot be known without seeking through the whole model.
 		# This is an easier way to deal with not being given a filter.
 		if len(permutation_filter) and not (
@@ -163,7 +170,7 @@ def import_halo1_markers_from_jms(jms, *, armature=None, scale=1.0, node_size=0.
 			size = scale if import_radius else node_size,
 			display="SPHERE"
 		)
-
+		bpy.context.collection.objects.link(scene_marker)
 		scene_marker.matrix_world = generate_matrix(marker, scale)
 
 		# Assign parent if index is valid.
@@ -173,21 +180,10 @@ def import_halo1_markers_from_jms(jms, *, armature=None, scale=1.0, node_size=0.
 			scene_marker.parent_type = 'BONE'
 			scene_marker.parent_bone = NODE_NAME_PREFIX+jms.nodes[marker.parent].name
 			scene_marker.location.y -= parent.length
-			# The rotation is offset by 0, 0, -90 euler, so we rotate it to
-			# fix that.
+		markers[i] = scene_marker
 
-			#scene_marker.location.rotate(Euler((0.0, 0.0, math.radians(90.0))))
-
-			# Then we subtract the length of the parent bone from the y axis,
-			# the y axis being the axis that is offset.
-
-			# In Halo, marker positions are relative to the start of their
-			# parent bone. In blender they are relative to the end of the bone.
-			# So, we subtract the length of the bone from the y axis to
-	        # make the final positions match up.
-			#scene_marker.location.y -= parent.length
-
-	#TODO: Should this return something?
+	#TODO: Should this return something? marco says YES
+	return markers
 
 def import_halo1_region_from_jms(jms, *,
 		name="unnamed",
@@ -355,3 +351,8 @@ def import_halo1_all_regions_from_jms(jms, *, name="", scale=1.0, parent_rig=Non
 def import_halo1_model_shader(name=""):
 	if bpy.data.materials.get(name, None) is None:
 		bpy.data.materials.new(name=name)
+
+def build_skeleton(armature, markers = {}):
+	return
+	
+

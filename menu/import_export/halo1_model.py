@@ -10,6 +10,7 @@ from ...halo1.model import (
 	import_halo1_markers_from_jms,
 	import_halo1_all_regions_from_jms,
 	import_halo1_model_shader,
+	build_skeleton
 )
 from ...constants import SCALE_MULTIPLIERS
 
@@ -36,7 +37,7 @@ class MT_krieg_ImportHalo1Model(bpy.types.Operator, ImportHelper):
 
 	use_nodes: BoolProperty(
 		name="Import Nodes",
-		description="Import the nodes/frames.",
+		description="Import the nodes",
 		default=True,
 	)
 	node_size: FloatProperty(
@@ -45,9 +46,9 @@ class MT_krieg_ImportHalo1Model(bpy.types.Operator, ImportHelper):
 		default=0.1,
 		min=0.0,
 	)
-	use_armatures: BoolProperty(
-		name="Import Nodes as Armature",
-		description="Import the nodes as armature.",
+	build_skeleton: BoolProperty(
+		name="Build skeleton",
+		description="Attach biped's nodes",
 		default=False,
 	)
 
@@ -94,21 +95,24 @@ class MT_krieg_ImportHalo1Model(bpy.types.Operator, ImportHelper):
 			raise ValueError('Invalid scale_enum state.')
 
 		# Test if jms import function doesn't crash.
-		jms = read_halo1model(self.filepath)
+		model = read_halo1model(self.filepath)
 
 		# Get name without path or file extension.
 		name = os.path.basename(os.path.splitext(self.filepath)[0])
 
 		# Import nodes into the scene.
-		armature, nodes = import_halo1_nodes_from_jms(jms, scale=scale, node_size=self.node_size)
+		armature, nodes = import_halo1_nodes_from_jms(model[0], scale=scale, node_size=self.node_size,build_skeleton=self.build_skeleton)
 		# Import markers.
-		import_halo1_markers_from_jms(jms, scale=scale,
+		markers = import_halo1_markers_from_jms(model[0], scale=scale,
 			node_size=self.marker_size, armature=armature, scene_nodes=nodes)
 
-		for mat in jms.materials:
-			import_halo1_model_shader(mat.name)
-
-		import_halo1_all_regions_from_jms(jms, name=name, scale=scale, parent_rig=armature)
+		#for mat in [ mat for mat in ]:
+		#	import_halo1_model_shader(mat.name)
+		for jms in model:
+			for mat in jms.materials:
+				import_halo1_model_shader(mat.name)
+		for jms in model:
+			import_halo1_all_regions_from_jms(jms, name=name, scale=scale, parent_rig=armature)
 
 		return {'FINISHED'}
 
@@ -123,7 +127,7 @@ class MT_krieg_ImportHalo1Model(bpy.types.Operator, ImportHelper):
 		row.prop(self, "use_nodes")
 		if self.use_nodes:
 			box.prop(self, "node_size")
-			box.prop(self, "use_armatures")
+			box.prop(self, "build_skeleton")
 
 		# Marker settings elements:
 

@@ -51,19 +51,10 @@ def create_cone(name="new_cone", base_size=1.0, height=3.0):
 
 	return cone
 def create_empty(name="empty",display="SPHERE", size =1.0):
-	curr_object = get_active_object()
-	curr_mode = curr_object.mode
+	empty = bpy.data.objects.new(name,None)
 
-	bpy.ops.object.mode_set(mode='OBJECT')
+	empty.empty_display_type = display
+	empty.empty_display_size = size
 
-	bpy.ops.object.empty_add(
-		type = display,
-		radius = size
-	)
-	empty = get_active_object()
-	empty.name = name
-	
-	set_active_object(curr_object)
-	bpy.ops.object.mode_set(mode=curr_mode)
 	return empty
 	
