@@ -130,7 +130,7 @@ def get_horizontal_direction(matrix, scale = 1.0):
 def get_up_direction(matrix):
     return matrix @ Vector((0.0,1.0,0.0))
 def centroid_3d(list):
-		vector = Vector((1.0,1.0,1.0))
+		vector = Vector((0.0,0.0,0.0))
 		if len(list) == 0:
 			return vector * 0.0
 		for elem in list:

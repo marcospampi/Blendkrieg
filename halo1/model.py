@@ -104,15 +104,23 @@ def import_halo1_nodes_from_jms(jms, *,
 		scene_node.parent = scene_nodes.get(node.parent_index, None)
 
 		M = generate_matrix(node,scale)
-		scene_node.tail = Vector((1.0,1.0,1.0)) *  VERY_SMALL_NUMBER
+		scene_node.tail.y += 0.01
 		if not scene_node.parent:
 			scene_node.matrix = M
 		else:
 			scene_node.matrix = scene_node.parent.matrix @ M
 
 		scene_nodes[i] = scene_node
+
+
 	if build_skeleton == True:
-		print ("I'm not gonna do this boi")
+		for node in scene_nodes.values():
+			if node.parent and len(node.parent.children) == 1:
+				node.parent.tail = node.head
+				node.use_connect = True 
+			elif node.parent and len(node.parent.children) > 1:
+				node.parent.tail = centroid_3d(list(map(lambda c: c.head,node.parent.children)))
+			#	node.use_connect = True
 
 	node_custom_shape = create_empty(name="bone sphere",size=node_size)
 
@@ -179,7 +187,7 @@ def import_halo1_markers_from_jms(jms, *, armature=None, scale=1.0, node_size=0.
 			scene_marker.parent = armature
 			scene_marker.parent_type = 'BONE'
 			scene_marker.parent_bone = NODE_NAME_PREFIX+jms.nodes[marker.parent].name
-			scene_marker.location.y -= parent.length
+			scene_marker.location.y -=  0.01 #parent.tail
 		markers[i] = scene_marker
 
 	#TODO: Should this return something? marco says YES
